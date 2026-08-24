@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pac-Man con Agentes Inteligentes</title>
+<style>
+  :root{
+    --bg:#0b0e1a;
+    --panel:#12162a;
+    --line:#2a3055;
+    --amarillo:#ffd23f;
+    --cian:#00e5ff;
+    --magenta:#ff4d6d;
+    --verde:#39ff14;
+    --texto:#e8ebff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:radial-gradient(circle at 50% 0%, #171c36 0%, var(--bg) 60%);
+    color:var(--texto);
+    font-family:'Consolas','Courier New',monospace;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px;
+    min-height:100vh;
+  }
+  h1{
+    letter-spacing:6px;
+    color:var(--amarillo);
+    text-shadow:0 0 10px rgba(255,210,63,.6);
+    font-size:28px;
+    margin:0 0 4px 0;
+  }
+  .subtitulo{color:#8f97c9;font-size:12px;letter-spacing:2px;margin-bottom:16px;text-transform:uppercase;}
+  .contenedor{
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+    justify-content:center;
+    max-width:1040px;
+  }
+  .zona-juego{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+  }
+  canvas{
+    background:#05060c;
+    border:3px solid var(--line);
+    border-radius:6px;
+    box-shadow:0 0 24px rgba(0,229,255,.15);
+  }
+  .controles{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+  }
+  select, button{
+    background:var(--panel);
+    color:var(--texto);
+    border:1px solid var(--line);
+    padding:8px 12px;
+    border-radius:4px;
+    font-family:inherit;
+    font-size:12px;
+    cursor:pointer;
+    letter-spacing:1px;
+  }
+  button:hover, select:hover{border-color:var(--cian);}
+  button.principal{background:var(--amarillo);color:#141414;font-weight:bold;border:none;}
+  button.principal:hover{background:#ffe07a;}
+  button.experimento{background:var(--magenta);color:#141414;font-weight:bold;border:none;}
+  button.experimento:hover{background:#ff7a92;}
+  .panel-lateral{
+    width:300px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:14px;
+    font-size:12px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    max-height:520px;
+    overflow-y:auto;
+  }
+  .panel-lateral h2{
+    font-size:12px;
+    color:var(--cian);
+    letter-spacing:2px;
+    margin:0;
+    text-transform:uppercase;
+    border-bottom:1px solid var(--line);
+    padding-bottom:6px;
+  }
+  .panel-lateral pre{
+    background:#05060c;
+    padding:8px;
+    border-radius:4px;
+    margin:0;
+    white-space:pre-wrap;
+    word-break:break-word;
+    font-size:11px;
+    color:#c7cdf0;
+    border:1px solid var(--line);
+  }
+  .accion-actual{
+    font-size:16px;
+    color:var(--verde);
+    text-shadow:0 0 8px rgba(57,255,20,.5);
+    text-align:center;
+  }
+  .marcador{
+    display:flex;
+    justify-content:space-between;
+    font-size:12px;
+    color:var(--amarillo);
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:11px;
+    margin-top:6px;
+  }
+  th,td{
+    border:1px solid var(--line);
+    padding:5px 6px;
+    text-align:center;
+  }
+  th{background:#1b2144;color:var(--cian);}
+  .resultados{width:640px;max-width:100%;}
+  .leyenda{font-size:10px;color:#8f97c9;margin-top:4px;}
+</style>
+</head>
+<body>
+
+<h1>PAC-MAN &middot; AGENTES</h1>
+<div class="subtitulo">reflejo simple vs. basado en modelo</div>
+
+<div class="contenedor">
+
+  <div class="zona-juego">
+    <canvas id="lienzo" width="640" height="480"></canvas>
+    <div class="controles">
+      <label for="selectorModo">Modo:</label>
+      <select id="selectorModo">
+        <option value="manual">Manual (teclado)</option>
+        <option value="reflejo">Agente de reflejo simple</option>
+        <option value="modelo">Agente basado en modelo</option>
+      </select>
+      <button class="principal" id="btnIniciar">Iniciar / Reiniciar</button>
+      <button class="experimento" id="btnExperimento">Ejecutar 20 partidas x agente</button>
+    </div>
+    <div class="leyenda">Manual: flechas del teclado. Espacio: iniciar / reiniciar.</div>
+
+    <div class="resultados" id="resultados" style="display:none;">
+      <h2 style="color:var(--cian);font-size:12px;letter-spacing:2px;">RESULTADOS DEL EXPERIMENTO (20 partidas por agente)</h2>
+      <table id="tablaResultados">
+        <thead>
+          <tr><th>Agente</th><th>Puntaje promedio</th><th>Desv. estándar</th><th>Supervivencia promedio (ticks)</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel-lateral">
+    <div>
+      <h2>Percepción</h2>
+      <pre id="cajaPercepcion">—</pre>
+    </div>
+    <div>
+      <h2>Estado interno (agente basado en modelo)</h2>
+      <pre id="cajaEstado">—</pre>
+    </div>
+    <div>
+      <h2>Acción elegida</h2>
+      <div class="accion-actual" id="cajaAccion">—</div>
+    </div>
+    <div>
+      <h2>Marcador</h2>
+      <div class="marcador"><span>Puntaje</span><span id="cajaPuntaje">0</span></div>
+      <div class="marcador"><span>Tiempo de supervivencia (ticks)</span><span id="cajaTicks">0</span></div>
+      <div class="marcador"><span>Puntos restantes</span><span id="cajaDots">0</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================================
+   CONFIGURACIÓN DEL TABLERO
+   ========================================================================= */
+const COLS = 20, ROWS = 15, CELL = 32; // 20*32=640, 15*32=480 -> coincide con el canvas
+const PAC_SPAWN   = {r:13, c:1};
+const GHOST_SPAWN = {r:1,  c:18};
+const TICK_MS = 170;       // duración de un ciclo de percepción-acción en modo normal
+const TICK_MS_RAPIDO = 0;  // en modo experimento no hay espera, se simula lo más rápido posible
+const LIMITE_TICKS = 1500; // límite de seguridad para evitar partidas infinitas
+
+// Bloques de pared interiores (además del borde, que siempre es pared)
+const BLOQUES_PARED = [
+  [2,2],[2,3],[3,2],[3,3],
+  [2,16],[2,17],[3,16],[3,17],
+  [2,9],[2,10],[3,9],
+  [6,5],[6,6],[7,5],
+  [6,13],[6,14],[7,14],
+  [5,9],[9,9],
+  [10,2],[10,3],[11,2],
+  [10,16],[10,17],[11,17],
+  [10,9],[11,10],
+  [4,7],[4,12],
+  [9,4],[9,15],
+  [8,1],[8,18]
+];
+
+const paredes = new Set(BLOQUES_PARED.map(([r,c]) => key(r,c)));
+
+function key(r,c){ return r+','+c; }
+
+function esPared(r,c){
+  if(r<0 || r>=ROWS || c<0 || c>=COLS) return true; // fuera del tablero = pared (borde)
+  return paredes.has(key(r,c));
+}
+
+// Conjunto de celdas con punto (dot) al iniciar una partida nueva
+function crearDotsIniciales(){
+  const s = new Set();
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(esPared(r,c)) continue;
+      if(r===PAC_SPAWN.r && c===PAC_SPAWN.c) continue;
+      if(r===GHOST_SPAWN.r && c===GHOST_SPAWN.c) continue;
+      s.add(key(r,c));
+    }
+  }
+  return s;
+}
+const TOTAL_DOTS = crearDotsIniciales().size;
+
+const DIRS = {
+  arriba:     {dr:-1, dc:0},
+  abajo:      {dr: 1, dc:0},
+  izquierda:  {dr: 0, dc:-1},
+  derecha:    {dr: 0, dc:1},
+  quieto:     {dr: 0, dc:0}
+};
+const OPUESTO = {arriba:'abajo', abajo:'arriba', izquierda:'derecha', derecha:'izquierda'};
+const LISTA_DIRS = [['arriba',-1,0],['abajo',1,0],['izquierda',0,-1],['derecha',0,1]];
+
+/* =========================================================================
+   LÓGICA DEL JUEGO (independiente de los agentes)
+   ========================================================================= */
+
+// Crea un estado de partida nuevo e independiente (se usa tanto para la partida
+// visible en pantalla como para cada partida simulada del experimento).
+function crearEstadoJuego(){
+  return {
+    pac:    {r:PAC_SPAWN.r,  c:PAC_SPAWN.c},
+    ghost:  {r:GHOST_SPAWN.r, c:GHOST_SPAWN.c},
+    dots:   crearDotsIniciales(),
+    puntaje: 0,
+    ticks:   0,
+    estadoInternoModelo: { ghostPosAnterior:null, ghostDireccionEstim:{dr:0,dc:0}, celdasVisitadas:[], direccionObjetivoPrevia:null },
+    direccionManual: null,
+    fase: 'jugando', // 'jugando' | 'atrapado' | 'ganado' | 'tiempo'
+  };
+}
+
+// Construye la PERCEPCIÓN que reciben los agentes a partir del estado actual del juego.
+// Sólo contiene información del instante presente (posiciones actuales, celdas libres
+// adyacentes y si hay un punto en cada celda adyacente). No incluye historial.
+function generarPercepcion(juego){
+  const {pac, ghost, dots} = juego;
+  return {
+    pacman: {r:pac.r, c:pac.c},
+    ghost:  {r:ghost.r, c:ghost.c},
+    libre: {
+      arriba:    !esPared(pac.r-1, pac.c),
+      abajo:     !esPared(pac.r+1, pac.c),
+      izquierda: !esPared(pac.r, pac.c-1),
+      derecha:   !esPared(pac.r, pac.c+1)
+    },
+    dotAdyacente: {
+      arriba:    dots.has(key(pac.r-1, pac.c)),
+      abajo:     dots.has(key(pac.r+1, pac.c)),
+      izquierda: dots.has(key(pac.r, pac.c-1)),
+      derecha:   dots.has(key(pac.r, pac.c+1))
+    },
+    fantasmaAdyacente: {
+      arriba:    ghost.r===pac.r-1 && ghost.c===pac.c,
+      abajo:     ghost.r===pac.r+1 && ghost.c===pac.c,
+      izquierda: ghost.c===pac.c-1 && ghost.r===pac.r,
+      derecha:   ghost.c===pac.c+1 && ghost.r===pac.r
+    },
+    distanciaFantasma: Math.abs(pac.r-ghost.r) + Math.abs(pac.c-ghost.c)
+  };
+}
+
+// Movimiento del fantasma (parte del ENTORNO, no es uno de los agentes que se piden).
+// Regla simple: con 60% de probabilidad se mueve reduciendo la distancia a Pac-Man
+// (persecución), y con 40% se mueve de forma aleatoria entre las direcciones libres.
+// Esto le da al fantasma un "sentido y velocidad" reconocibles por el agente basado en modelo.
+function moverFantasma(juego){
+  const {ghost, pac} = juego;
+  const opciones = LISTA_DIRS.filter(([n,dr,dc]) => !esPared(ghost.r+dr, ghost.c+dc));
+  if(opciones.length===0) return;
+  let elegida;
+  if(Math.random() < 0.6){
+    opciones.sort((a,b)=>{
+      const da = Math.abs((ghost.r+a[1])-pac.r) + Math.abs((ghost.c+a[2])-pac.c);
+      const db = Math.abs((ghost.r+b[1])-pac.r) + Math.abs((ghost.c+b[2])-pac.c);
+      return da-db;
+    });
+    elegida = opciones[0];
+  } else {
+    elegida = opciones[Math.floor(Math.random()*opciones.length)];
+  }
+  ghost.r += elegida[1];
+  ghost.c += elegida[2];
+}
+
+// Avanza un ciclo completo de percepción -> decisión -> acción -> actualización del entorno.
+// modoAgente: 'manual' | 'reflejo' | 'modelo'
+function avanzarTick(juego, modoAgente){
+  if(juego.fase !== 'jugando') return {percepcion:null, accion:null};
+
+  const percepcion = generarPercepcion(juego);
+
+  let accion;
+  if(modoAgente === 'manual'){
+    accion = juego.direccionManual || 'quieto';
+  } else if(modoAgente === 'reflejo'){
+    accion = agenteReflejo(percepcion);
+  } else { // 'modelo'
+    const resultado = agenteModelo(percepcion, juego.estadoInternoModelo);
+    accion = resultado.accion;
+    juego.estadoInternoModelo = resultado.nuevoEstado;
+  }
+
+  const d = DIRS[accion] || DIRS.quieto;
+  const nr = juego.pac.r + d.dr, nc = juego.pac.c + d.dc;
+  if(!esPared(nr,nc)){ juego.pac.r = nr; juego.pac.c = nc; }
+
+  const k = key(juego.pac.r, juego.pac.c);
+  if(juego.dots.has(k)){ juego.dots.delete(k); juego.puntaje += 10; }
+
+  moverFantasma(juego);
+  juego.ticks++;
+
+  if(juego.pac.r===juego.ghost.r && juego.pac.c===juego.ghost.c){
+    juego.fase = 'atrapado';
+  } else if(juego.dots.size===0){
+    juego.fase = 'ganado';
+  } else if(juego.ticks >= LIMITE_TICKS){
+    juego.fase = 'tiempo';
+  }
+
+  return {percepcion, accion};
+}
+
+/* =========================================================================
+   AGENTE DE REFLEJO SIMPLE
+   Decide ÚNICAMENTE con la percepción del instante actual, sin memoria de
+   estados anteriores. Se implementa como un conjunto explícito de reglas
+   condición-acción, evaluadas en orden de prioridad.
+   ========================================================================= */
+function agenteReflejo(percepcion){
+  const direccionesLibres = ['arriba','abajo','izquierda','derecha'].filter(d => percepcion.libre[d]);
+
+  // Regla 1 (evasión): si el fantasma está en la celda adyacente en una dirección,
+  // huir hacia la dirección opuesta, si esa dirección opuesta está libre.
+  for(const d of ['arriba','abajo','izquierda','derecha']){
+    if(percepcion.fantasmaAdyacente[d] && percepcion.libre[OPUESTO[d]]){
+      return OPUESTO[d];
+    }
+  }
+
+  // Regla 2 (alimentación): si hay un punto en una celda adyacente libre, moverse hacia ella.
+  for(const d of ['arriba','abajo','izquierda','derecha']){
+    if(percepcion.dotAdyacente[d] && percepcion.libre[d]){
+      return d;
+    }
+  }
+
+  // Regla 3 (exploración reactiva): si no hay puntos adyacentes ni peligro inmediato,
+  // moverse hacia cualquier dirección libre disponible (sin recordar visitas previas).
+  if(direccionesLibres.length > 0){
+    return direccionesLibres[Math.floor(Math.random()*direccionesLibres.length)];
+  }
+
+  // Regla 4 (bloqueo total): si no existe ninguna dirección libre, permanecer quieto.
+  return 'quieto';
+}
+
+/* =========================================================================
+   AGENTE BASADO EN MODELO
+   Mantiene un estado interno que registra:
+     - ghostPosAnterior:     posición previa del fantasma (para estimar velocidad/sentido)
+     - ghostDireccionEstim:  vector de velocidad estimado del fantasma {dr,dc}
+     - celdasVisitadas:      celdas ya recorridas por Pac-Man (para no repetir camino)
+     - direccionObjetivoPrevia: última acción elegida
+   Usa ese modelo para PREDECIR la posición futura del fantasma antes de decidir
+   (búsqueda del camino más corto hacia el punto más cercano evitando la zona de riesgo).
+   ========================================================================= */
+function agenteModelo(percepcion, estadoInterno){
+  const est = estadoInterno || { ghostPosAnterior:null, ghostDireccionEstim:{dr:0,dc:0}, celdasVisitadas:[], direccionObjetivoPrevia:null };
+  const visitadas = new Set(est.celdasVisitadas);
+  visitadas.add(key(percepcion.pacman.r, percepcion.pacman.c));
+
+  // 1. Estimar velocidad y sentido del fantasma comparando con su posición anterior.
+  let dr = 0, dc = 0;
+  if(est.ghostPosAnterior){
+    dr = percepcion.ghost.r - est.ghostPosAnterior.r;
+    dc = percepcion.ghost.c - est.ghostPosAnterior.c;
+  }
+  const ghostDireccionEstim = {dr, dc};
+
+  // 2. Predecir la posición futura del fantasma (un paso adelante) con el modelo de velocidad.
+  const ghostPredicho = { r: percepcion.ghost.r + dr, c: percepcion.ghost.c + dc };
+
+  // 3. Planificar: BFS hacia el punto alcanzable más cercano, evitando pisar la celda
+  //    donde se predice que estará el fantasma (representación explícita del riesgo futuro).
+  const destino = buscarRutaMasCorta(percepcion.pacman, ghostPredicho, visitadas);
+
+  let accion;
+  if(destino){
+    accion = destino.primerPaso;
+  } else {
+    // Sin ruta segura conocida: recurre a una regla reactiva de emergencia.
+    accion = agenteReflejo(percepcion);
+  }
+
+  const nuevoEstado = {
+    ghostPosAnterior: {r: percepcion.ghost.r, c: percepcion.ghost.c},
+    ghostDireccionEstim,
+    celdasVisitadas: Array.from(visitadas),
+    direccionObjetivoPrevia: accion
+  };
+
+  return {accion, nuevoEstado};
+}
+
+// Búsqueda en anchura (BFS) desde la posición de Pac-Man hasta el punto (dot) más
+// cercano, evitando muros y la celda de peligro predicha para el fantasma.
+// Prioriza puntos en celdas NO visitadas antes que puntos ya recorridos.
+function buscarRutaMasCorta(inicio, peligro, visitadas){
+  const cola = [{r:inicio.r, c:inicio.c, primerPaso:null}];
+  const visitadosBFS = new Set([key(inicio.r, inicio.c)]);
+  let mejorNoVisitado = null, mejorCualquiera = null;
+
+  while(cola.length){
+    const actual = cola.shift();
+
+    for(const [nombre, ddr, ddc] of LISTA_DIRS){
+      const nr = actual.r+ddr, nc = actual.c+ddc;
+      const k = key(nr,nc);
+      if(esPared(nr,nc) || visitadosBFS.has(k)) continue;
+      if(nr===peligro.r && nc===peligro.c) continue; // celda peligrosa predicha: evitar
+
+      visitadosBFS.add(k);
+      const nodo = {r:nr, c:nc, primerPaso: actual.primerPaso || nombre};
+
+      if(juegoActivo && juegoActivo.dots.has(k)){
+        if(!visitadas.has(k) && !mejorNoVisitado) mejorNoVisitado = nodo;
+        if(!mejorCualquiera) mejorCualquiera = nodo;
+      }
+      cola.push(nodo);
+    }
+  }
+  return mejorNoVisitado || mejorCualquiera;
+}
+
+/* =========================================================================
+   ESTADO DE LA APLICACIÓN (interfaz + partida visible en pantalla)
+   ========================================================================= */
+let juegoActivo = crearEstadoJuego(); // la partida que se está viendo/jugando en pantalla
+let faseApp = 'inicio'; // 'inicio' | 'jugando' | 'fin'
+let modoSeleccionado = 'manual';
+let ultimaPercepcion = null;
+let ultimaAccion = null;
+let mensajeFin = '';
+let ultimoTick = 0;
+
+const lienzo = document.getElementById('lienzo');
+const ctx = lienzo.getContext('2d');
+const selectorModo = document.getElementById('selectorModo');
+const btnIniciar = document.getElementById('btnIniciar');
+const btnExperimento = document.getElementById('btnExperimento');
+
+selectorModo.addEventListener('change', () => {
+  modoSeleccionado = selectorModo.value;
+});
+
+btnIniciar.addEventListener('click', iniciarPartida);
+
+function iniciarPartida(){
+  juegoActivo = crearEstadoJuego();
+  faseApp = 'jugando';
+  ultimaPercepcion = null;
+  ultimaAccion = null;
+  mensajeFin = '';
+}
+
+// --- Controles de teclado (modo manual) ---
+window.addEventListener('keydown', (e) => {
+  const mapa = {ArrowUp:'arriba', ArrowDown:'abajo', ArrowLeft:'izquierda', ArrowRight:'derecha'};
+  if(mapa[e.key]){
+    e.preventDefault();
+    juegoActivo.direccionManual = mapa[e.key];
+  }
+  if(e.code === 'Space'){
+    e.preventDefault();
+    iniciarPartida();
+  }
+});
+
+/* =========================================================================
+   BUCLE PRINCIPAL (requestAnimationFrame) — separa el ritmo lógico (ticks)
+   del ritmo de dibujo (se redibuja en cada frame).
+   ========================================================================= */
+function bucle(timestamp){
+  if(faseApp === 'jugando'){
+    if(timestamp - ultimoTick >= TICK_MS){
+      const {percepcion, accion} = avanzarTick(juegoActivo, modoSeleccionado);
+      if(percepcion){ ultimaPercepcion = percepcion; ultimaAccion = accion; }
+      ultimoTick = timestamp;
+      if(juegoActivo.fase !== 'jugando'){
+        faseApp = 'fin';
+        mensajeFin = juegoActivo.fase === 'atrapado' ? '¡Atrapado por el fantasma!' :
+                     juegoActivo.fase === 'ganado'   ? '¡Recolectaste todos los puntos!' :
+                                                        'Tiempo límite alcanzado.';
+      }
+    }
+  }
+  dibujar();
+  actualizarPanel();
+  requestAnimationFrame(bucle);
+}
+requestAnimationFrame(bucle);
+
+/* =========================================================================
+   DIBUJO (canvas) — estética retro con formas geométricas
+   ========================================================================= */
+function dibujar(){
+  ctx.clearRect(0,0,lienzo.width, lienzo.height);
+  ctx.fillStyle = '#05060c';
+  ctx.fillRect(0,0,lienzo.width, lienzo.height);
+
+  dibujarLaberinto();
+
+  if(faseApp === 'inicio'){
+    dibujarPantallaInicio();
+    return;
+  }
+
+  dibujarDots(juegoActivo.dots);
+  dibujarFantasma(juegoActivo.ghost);
+  dibujarPacman(juegoActivo.pac);
+  dibujarMarcador(juegoActivo);
+
+  if(faseApp === 'fin'){
+    dibujarPantallaFin();
+  }
+}
+
+function dibujarLaberinto(){
+  ctx.fillStyle = '#1b2260';
+  ctx.strokeStyle = '#3b46a8';
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(esPared(r,c)){
+        ctx.fillRect(c*CELL, r*CELL, CELL, CELL);
+        ctx.strokeRect(c*CELL+1, r*CELL+1, CELL-2, CELL-2);
+      }
+    }
+  }
+}
+
+function dibujarDots(dots){
+  ctx.fillStyle = '#ffd23f';
+  for(const k of dots){
+    const [r,c] = k.split(',').map(Number);
+    const cx = c*CELL + CELL/2, cy = r*CELL + CELL/2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function dibujarPacman(pac){
+  const cx = pac.c*CELL + CELL/2, cy = pac.r*CELL + CELL/2;
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  ctx.arc(cx, cy, CELL/2-3, 0.25*Math.PI, 1.75*Math.PI);
+  ctx.lineTo(cx, cy);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function dibujarFantasma(ghost){
+  const cx = ghost.c*CELL + CELL/2, cy = ghost.r*CELL + CELL/2;
+  const rad = CELL/2 - 4;
+  ctx.fillStyle = '#ff4d6d';
+  ctx.beginPath();
+  ctx.arc(cx, cy-2, rad, Math.PI, 0);
+  ctx.lineTo(cx+rad, cy+rad);
+  ctx.lineTo(cx+rad*0.5, cy+rad*0.6);
+  ctx.lineTo(cx, cy+rad);
+  ctx.lineTo(cx-rad*0.5, cy+rad*0.6);
+  ctx.lineTo(cx-rad, cy+rad);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#0b0e1a';
+  ctx.beginPath();
+  ctx.arc(cx-4, cy-4, 3, 0, Math.PI*2);
+  ctx.arc(cx+4, cy-4, 3, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function dibujarMarcador(juego){
+  ctx.fillStyle = '#e8ebff';
+  ctx.font = 'bold 14px Consolas, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('PUNTAJE: ' + juego.puntaje, 10, 20);
+  ctx.textAlign = 'right';
+  ctx.fillText('TICKS: ' + juego.ticks, lienzo.width-10, 20);
+}
+
+function dibujarPantallaInicio(){
+  ctx.fillStyle = 'rgba(5,6,12,0.85)';
+  ctx.fillRect(0,0,lienzo.width, lienzo.height);
+  ctx.fillStyle = '#ffd23f';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 32px Consolas, monospace';
+  ctx.fillText('PAC-MAN · AGENTES', lienzo.width/2, lienzo.height/2 - 30);
+  ctx.fillStyle = '#e8ebff';
+  ctx.font = '14px Consolas, monospace';
+  ctx.fillText('Elige un modo y presiona "Iniciar / Reiniciar" o ESPACIO', lienzo.width/2, lienzo.height/2 + 6);
+  ctx.fillText('Flechas del teclado = modo manual', lienzo.width/2, lienzo.height/2 + 28);
+}
+
+function dibujarPantallaFin(){
+  ctx.fillStyle = 'rgba(5,6,12,0.85)';
+  ctx.fillRect(0,0,lienzo.width, lienzo.height);
+  ctx.fillStyle = '#ff4d6d';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 26px Consolas, monospace';
+  ctx.fillText(mensajeFin, lienzo.width/2, lienzo.height/2 - 20);
+  ctx.fillStyle = '#e8ebff';
+  ctx.font = '14px Consolas, monospace';
+  ctx.fillText('Puntaje final: ' + juegoActivo.puntaje + '   |   Ticks sobrevividos: ' + juegoActivo.ticks, lienzo.width/2, lienzo.height/2 + 10);
+  ctx.fillText('Presiona ESPACIO o "Iniciar / Reiniciar" para jugar de nuevo', lienzo.width/2, lienzo.height/2 + 32);
+}
+
+/* =========================================================================
+   PANEL LATERAL (percepción, estado interno, acción, marcador)
+   ========================================================================= */
+const cajaPercepcion = document.getElementById('cajaPercepcion');
+const cajaEstado = document.getElementById('cajaEstado');
+const cajaAccion = document.getElementById('cajaAccion');
+const cajaPuntaje = document.getElementById('cajaPuntaje');
+const cajaTicks = document.getElementById('cajaTicks');
+const cajaDots = document.getElementById('cajaDots');
+
+function actualizarPanel(){
+  cajaPercepcion.textContent = ultimaPercepcion ? JSON.stringify(ultimaPercepcion, null, 1) : '—';
+  cajaEstado.textContent = (modoSeleccionado === 'modelo')
+    ? JSON.stringify(juegoActivo.estadoInternoModelo, null, 1)
+    : '(sólo aplica en modo "Agente basado en modelo")';
+  cajaAccion.textContent = ultimaAccion ? ultimaAccion.toUpperCase() : '—';
+  cajaPuntaje.textContent = juegoActivo.puntaje;
+  cajaTicks.textContent = juegoActivo.ticks;
+  cajaDots.textContent = juegoActivo.dots.size + ' / ' + TOTAL_DOTS;
+}
+
+/* =========================================================================
+   EXPERIMENTACIÓN: 20 partidas aceleradas por agente (reflejo y modelo)
+   ========================================================================= */
+btnExperimento.addEventListener('click', ejecutarExperimento);
+
+function simularPartida(modoAgente){
+  const juego = crearEstadoJuego();
+  const activoAnterior = juegoActivo;
+  juegoActivo = juego; // buscarRutaMasCorta consulta juegoActivo.dots; se apunta temporalmente a esta partida
+  let salvaguarda = 0;
+  while(juego.fase === 'jugando' && salvaguarda < LIMITE_TICKS + 5){
+    avanzarTick(juego, modoAgente);
+    salvaguarda++;
+  }
+  juegoActivo = activoAnterior;
+  return { puntaje: juego.puntaje, ticks: juego.ticks };
+}
+
+function media(valores){
+  return valores.reduce((a,b)=>a+b,0) / valores.length;
+}
+function desviacionEstandar(valores){
+  const m = media(valores);
+  const varianza = valores.reduce((acc,v)=> acc + (v-m)*(v-m), 0) / valores.length;
+  return Math.sqrt(varianza);
+}
+
+function ejecutarExperimento(){
+  btnExperimento.disabled = true;
+  btnExperimento.textContent = 'Ejecutando 40 partidas...';
+  faseApp = 'inicio'; // pausa la visualización mientras se simula
+
+  // setTimeout permite que el navegador pinte el botón deshabilitado antes de bloquear el hilo
+  setTimeout(() => {
+    const resultadosPorAgente = {};
+    for(const agente of ['reflejo','modelo']){
+      const puntajes = [], tiempos = [];
+      for(let i=0;i<20;i++){
+        const r = simularPartida(agente);
+        puntajes.push(r.puntaje);
+        tiempos.push(r.ticks);
+      }
+      resultadosPorAgente[agente] = {
+        puntajePromedio: media(puntajes).toFixed(1),
+        desviacion: desviacionEstandar(puntajes).toFixed(1),
+        supervivenciaPromedio: media(tiempos).toFixed(1)
+      };
+    }
+    mostrarResultados(resultadosPorAgente);
+    btnExperimento.disabled = false;
+    btnExperimento.textContent = 'Ejecutar 20 partidas x agente';
+  }, 50);
+}
+
+function mostrarResultados(resultados){
+  const contenedor = document.getElementById('resultados');
+  const tbody = document.querySelector('#tablaResultados tbody');
+  tbody.innerHTML = '';
+  const nombres = {reflejo:'Agente de reflejo simple', modelo:'Agente basado en modelo'};
+  for(const clave of ['reflejo','modelo']){
+    const r = resultados[clave];
+    const fila = document.createElement('tr');
+    fila.innerHTML = `<td>${nombres[clave]}</td><td>${r.puntajePromedio}</td><td>${r.desviacion}</td><td>${r.supervivenciaPromedio}</td>`;
+    tbody.appendChild(fila);
+  }
+  contenedor.style.display = 'block';
+}
+</script>
+</body>
+</html>
