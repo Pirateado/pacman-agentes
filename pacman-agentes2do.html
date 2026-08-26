@@ -1,0 +1,1098 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pac-Man con Agentes Inteligentes</title>
+<style>
+  :root{
+    --bg:#0b0e1a;
+    --panel:#12162a;
+    --line:#2a3055;
+    --amarillo:#ffd23f;
+    --cian:#00e5ff;
+    --magenta:#ff4d6d;
+    --verde:#39ff14;
+    --morado:#b98bff;
+    --texto:#e8ebff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:radial-gradient(circle at 50% 0%, #171c36 0%, var(--bg) 60%);
+    color:var(--texto);
+    font-family:'Consolas','Courier New',monospace;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:20px;
+    min-height:100vh;
+  }
+  h1{
+    letter-spacing:6px;
+    color:var(--amarillo);
+    text-shadow:0 0 10px rgba(255,210,63,.6);
+    font-size:26px;
+    margin:0 0 4px 0;
+  }
+  .subtitulo{color:#8f97c9;font-size:11px;letter-spacing:2px;margin-bottom:14px;text-transform:uppercase;}
+  .contenedor{
+    display:flex;
+    gap:18px;
+    flex-wrap:wrap;
+    justify-content:center;
+    max-width:1080px;
+  }
+  .zona-juego{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:10px;
+  }
+  canvas{
+    background:#05060c;
+    border:3px solid var(--line);
+    border-radius:6px;
+    box-shadow:0 0 24px rgba(0,229,255,.15);
+  }
+  .fila-controles{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    width:640px;
+    max-width:100%;
+  }
+  select, button, input[type=range]{
+    background:var(--panel);
+    color:var(--texto);
+    border:1px solid var(--line);
+    padding:7px 10px;
+    border-radius:4px;
+    font-family:inherit;
+    font-size:11px;
+    cursor:pointer;
+    letter-spacing:.5px;
+  }
+  select:hover, input[type=range]:hover{border-color:var(--cian);}
+  button:hover{border-color:var(--cian);}
+  button.principal{background:var(--amarillo);color:#141414;font-weight:bold;border:none;}
+  button.principal:hover{background:#ffe07a;}
+  button.experimento{background:var(--magenta);color:#141414;font-weight:bold;border:none;}
+  button.experimento:hover{background:#ff7a92;}
+  button.pausa{background:var(--morado);color:#141414;font-weight:bold;border:none;}
+  button.pausa:hover{background:#d1b3ff;}
+  .grupo-slider{display:flex;flex-direction:column;gap:2px;align-items:flex-start;min-width:118px;}
+  .grupo-slider label{color:#8f97c9;font-size:10px;letter-spacing:.5px;}
+  .grupo-slider .valor{color:var(--verde);font-weight:bold;}
+  .caja-pesos{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    justify-content:center;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:10px 14px;
+    width:640px;
+    max-width:100%;
+  }
+  .panel-lateral{
+    width:320px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:14px;
+    font-size:12px;
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    max-height:620px;
+    overflow-y:auto;
+  }
+  .panel-lateral h2{
+    font-size:12px;
+    color:var(--cian);
+    letter-spacing:2px;
+    margin:0;
+    text-transform:uppercase;
+    border-bottom:1px solid var(--line);
+    padding-bottom:6px;
+  }
+  .panel-lateral pre{
+    background:#05060c;
+    padding:8px;
+    border-radius:4px;
+    margin:0;
+    white-space:pre-wrap;
+    word-break:break-word;
+    font-size:11px;
+    color:#c7cdf0;
+    border:1px solid var(--line);
+    max-height:180px;
+    overflow-y:auto;
+  }
+  .accion-actual{
+    font-size:16px;
+    color:var(--verde);
+    text-shadow:0 0 8px rgba(57,255,20,.5);
+    text-align:center;
+  }
+  .marcador{
+    display:flex;
+    justify-content:space-between;
+    font-size:12px;
+    color:var(--amarillo);
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:10.5px;
+    margin-top:6px;
+  }
+  th,td{
+    border:1px solid var(--line);
+    padding:4px 5px;
+    text-align:center;
+  }
+  th{background:#1b2144;color:var(--cian);}
+  tr.ganador td{background:rgba(57,255,20,.12);color:var(--verde);font-weight:bold;}
+  .resultados{width:660px;max-width:100%;}
+  .leyenda{font-size:10px;color:#8f97c9;margin-top:2px;text-align:center;}
+</style>
+</head>
+<body>
+
+<h1>PAC-MAN &middot; AGENTES</h1>
+<div class="subtitulo">reflejo &middot; modelo &middot; objetivos &middot; utilidad</div>
+
+<div class="contenedor">
+
+  <div class="zona-juego">
+    <canvas id="lienzo" width="640" height="480"></canvas>
+
+    <div class="fila-controles">
+      <label for="selectorModo">Modo:</label>
+      <select id="selectorModo">
+        <option value="manual">Manual (teclado)</option>
+        <option value="reflejo">Agente de reflejo simple</option>
+        <option value="modelo">Agente basado en modelo</option>
+        <option value="objetivos">Agente basado en objetivos</option>
+        <option value="utilidad">Agente basado en utilidad</option>
+      </select>
+      <button class="principal" id="btnIniciar">Iniciar / Reiniciar</button>
+      <button class="pausa" id="btnPausa">Pausar</button>
+      <label for="selectorVelocidad">Velocidad:</label>
+      <select id="selectorVelocidad">
+        <option value="1">x1</option>
+        <option value="2">x2</option>
+        <option value="4">x4</option>
+        <option value="8">x8</option>
+      </select>
+    </div>
+
+    <div class="fila-controles">
+      <div class="grupo-slider" style="min-width:220px;">
+        <label>Radio de visión del agente: <span class="valor" id="valorRadio">20</span></label>
+        <input type="range" id="sliderRadio" min="1" max="20" value="20" step="1" style="width:220px;">
+      </div>
+      <label for="selectorMedida">Medida de desempeño:</label>
+      <select id="selectorMedida">
+        <option value="puntaje">Puntaje promedio</option>
+        <option value="eficiencia">Eficiencia (pts/tick)</option>
+        <option value="supervivencia">Supervivencia (ticks)</option>
+      </select>
+    </div>
+
+    <div class="caja-pesos">
+      <div class="grupo-slider">
+        <label>Peso VALOR: <span class="valor" id="valorPesoValor">1.0</span></label>
+        <input type="range" id="sliderValor" min="0" max="3" value="1" step="0.1">
+      </div>
+      <div class="grupo-slider">
+        <label>Peso COSTO: <span class="valor" id="valorPesoCosto">0.5</span></label>
+        <input type="range" id="sliderCosto" min="0" max="3" value="0.5" step="0.1">
+      </div>
+      <div class="grupo-slider">
+        <label>Peso RIESGO: <span class="valor" id="valorPesoRiesgo">2.0</span></label>
+        <input type="range" id="sliderRiesgo" min="0" max="3" value="2" step="0.1">
+      </div>
+      <div class="grupo-slider">
+        <label>Peso NOVEDAD: <span class="valor" id="valorPesoNovedad">0.5</span></label>
+        <input type="range" id="sliderNovedad" min="0" max="3" value="0.5" step="0.1">
+      </div>
+    </div>
+
+    <div class="fila-controles">
+      <button class="experimento" id="btnExperimento">Ejecutar 20 partidas x agente</button>
+    </div>
+    <div class="leyenda">Manual: flechas del teclado. Espacio: iniciar / reiniciar. Los pesos sólo afectan al agente de utilidad.</div>
+
+    <div class="resultados" id="resultados" style="display:none;">
+      <h2 style="color:var(--cian);font-size:12px;letter-spacing:2px;">RESULTADOS DEL EXPERIMENTO (20 partidas por agente)</h2>
+      <table id="tablaResultados">
+        <thead>
+          <tr><th>Agente</th><th>Puntaje promedio</th><th>Desv. estándar</th><th>Supervivencia (ticks)</th><th>Eficiencia (pts/tick)</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel-lateral">
+    <div>
+      <h2>Percepción</h2>
+      <pre id="cajaPercepcion">—</pre>
+    </div>
+    <div>
+      <h2>Estado interno / meta del agente</h2>
+      <pre id="cajaEstado">—</pre>
+    </div>
+    <div id="bloqueTablaMetas" style="display:none;">
+      <h2>Metas evaluadas (utilidad)</h2>
+      <table id="tablaMetasPanel">
+        <thead><tr><th>Meta</th><th>Valor</th><th>Costo</th><th>Riesgo</th><th>Novedad</th><th>U</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div>
+      <h2>Acción elegida</h2>
+      <div class="accion-actual" id="cajaAccion">—</div>
+    </div>
+    <div>
+      <h2>Marcador</h2>
+      <div class="marcador"><span>Puntaje</span><span id="cajaPuntaje">0</span></div>
+      <div class="marcador"><span>Tiempo de supervivencia (ticks)</span><span id="cajaTicks">0</span></div>
+      <div class="marcador"><span>Puntos restantes</span><span id="cajaDots">0</span></div>
+      <div class="marcador"><span>Desempeño (<span id="cajaNombreMedida">puntaje</span>)</span><span id="cajaMedida">0</span></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================================
+   CONFIGURACIÓN DEL TABLERO
+   ========================================================================= */
+const COLS = 20, ROWS = 15, CELL = 32; // 20*32=640, 15*32=480 -> coincide con el canvas
+const PAC_SPAWN   = {r:13, c:1};
+const GHOST_SPAWN = {r:1,  c:18};
+const TICK_MS = 170;        // duración base de un ciclo de percepción-acción (a velocidad x1)
+const LIMITE_TICKS = 1500;  // límite de seguridad para evitar partidas infinitas
+const PROB_PERSECUCION_FANTASMA = 0.65; // 65% de las veces el fantasma persigue por la ruta óptima
+const RADIO_RIESGO = 5;     // distancia dentro de la cual el fantasma se considera "riesgoso"
+
+// Bloques de pared interiores (además del borde, que siempre es pared)
+const BLOQUES_PARED = [
+  [2,2],[2,3],[3,2],[3,3],
+  [2,16],[2,17],[3,16],[3,17],
+  [2,9],[2,10],[3,9],
+  [6,5],[6,6],[7,5],
+  [6,13],[6,14],[7,14],
+  [5,9],[9,9],
+  [10,2],[10,3],[11,2],
+  [10,16],[10,17],[11,17],
+  [10,9],[11,10],
+  [4,7],[4,12],
+  [9,4],[9,15],
+  [8,1],[8,18]
+];
+const paredes = new Set(BLOQUES_PARED.map(([r,c]) => key(r,c)));
+
+function key(r,c){ return r+','+c; }
+function distManhattan(a,b){ return Math.abs(a.r-b.r)+Math.abs(a.c-b.c); }
+function distChebyshev(a,b){ return Math.max(Math.abs(a.r-b.r), Math.abs(a.c-b.c)); }
+
+function esPared(r,c){
+  if(r<0 || r>=ROWS || c<0 || c>=COLS) return true; // fuera del tablero = pared (borde)
+  return paredes.has(key(r,c));
+}
+
+function crearDotsIniciales(){
+  const s = new Set();
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(esPared(r,c)) continue;
+      if(r===PAC_SPAWN.r && c===PAC_SPAWN.c) continue;
+      if(r===GHOST_SPAWN.r && c===GHOST_SPAWN.c) continue;
+      s.add(key(r,c));
+    }
+  }
+  return s;
+}
+const TOTAL_DOTS = crearDotsIniciales().size;
+
+const DIRS = {
+  arriba:     {dr:-1, dc:0},
+  abajo:      {dr: 1, dc:0},
+  izquierda:  {dr: 0, dc:-1},
+  derecha:    {dr: 0, dc:1},
+  quieto:     {dr: 0, dc:0}
+};
+const OPUESTO = {arriba:'abajo', abajo:'arriba', izquierda:'derecha', derecha:'izquierda'};
+const LISTA_DIRS = [['arriba',-1,0],['abajo',1,0],['izquierda',0,-1],['derecha',0,1]];
+
+/* =========================================================================
+   PARÁMETROS AJUSTABLES DESDE LA INTERFAZ (afectan la percepción y al
+   agente de utilidad; no rompen el comportamiento por defecto)
+   ========================================================================= */
+let radioVision = 20;      // 20 ~ visión de todo el tablero (comportamiento original)
+let pesosUtilidad = { valor:1.0, costo:0.5, riesgo:2.0, novedad:0.5 };
+let medidaDesempeno = 'puntaje'; // 'puntaje' | 'eficiencia' | 'supervivencia'
+let multiplicadorVelocidad = 1;  // 1, 2, 4, 8
+let pausado = false;
+
+/* =========================================================================
+   LÓGICA DEL JUEGO (independiente de los agentes)
+   ========================================================================= */
+
+function crearEstadoJuego(){
+  return {
+    pac:    {r:PAC_SPAWN.r,  c:PAC_SPAWN.c},
+    ghost:  {r:GHOST_SPAWN.r, c:GHOST_SPAWN.c},
+    dots:   crearDotsIniciales(),
+    puntaje: 0,
+    ticks:   0,
+    direccionManual: null,
+    fase: 'jugando', // 'jugando' | 'atrapado' | 'ganado' | 'tiempo'
+    // Un estado interno independiente por cada arquitectura con memoria:
+    estadoInternoModelo:    { ghostPosAnterior:null, ghostDireccionEstim:{dr:0,dc:0}, dotsConocidos:[], celdasVisitadas:[] },
+    estadoInternoObjetivos: { metaActual:null, dotsConocidos:[], celdasVisitadas:[] },
+    estadoInternoUtilidad:  { ghostPosAnterior:null, ghostDireccionEstim:{dr:0,dc:0}, dotsConocidos:[], celdasVisitadas:[], metaActual:null, tablaMetas:[] }
+  };
+}
+
+// Construye la PERCEPCIÓN que reciben los agentes a partir del estado actual del juego.
+// Incluye tanto información puramente local (celdas adyacentes, usada por el agente de
+// reflejo) como información filtrada por el RADIO DE VISIÓN configurado (usada por los
+// agentes que planean a más largo plazo: modelo, objetivos y utilidad).
+function generarPercepcion(juego){
+  const {pac, ghost, dots} = juego;
+
+  const distanciaRealFantasma = distManhattan(pac, ghost);
+  const visibleFantasma = distChebyshev(pac, ghost) <= radioVision;
+
+  const dotsVisibles = [];
+  for(let dr=-radioVision; dr<=radioVision; dr++){
+    for(let dc=-radioVision; dc<=radioVision; dc++){
+      const r = pac.r+dr, c = pac.c+dc;
+      if(r<0||r>=ROWS||c<0||c>=COLS) continue;
+      if(dots.has(key(r,c))) dotsVisibles.push({r,c});
+    }
+  }
+
+  return {
+    pacman: {r:pac.r, c:pac.c},
+    // --- percepción puramente local (sin radio, siempre real: usada por el reflejo) ---
+    libre: {
+      arriba:    !esPared(pac.r-1, pac.c),
+      abajo:     !esPared(pac.r+1, pac.c),
+      izquierda: !esPared(pac.r, pac.c-1),
+      derecha:   !esPared(pac.r, pac.c+1)
+    },
+    dotAdyacente: {
+      arriba:    dots.has(key(pac.r-1, pac.c)),
+      abajo:     dots.has(key(pac.r+1, pac.c)),
+      izquierda: dots.has(key(pac.r, pac.c-1)),
+      derecha:   dots.has(key(pac.r, pac.c+1))
+    },
+    fantasmaAdyacente: {
+      arriba:    ghost.r===pac.r-1 && ghost.c===pac.c,
+      abajo:     ghost.r===pac.r+1 && ghost.c===pac.c,
+      izquierda: ghost.c===pac.c-1 && ghost.r===pac.r,
+      derecha:   ghost.c===pac.c+1 && ghost.r===pac.r
+    },
+    distanciaFantasma: distanciaRealFantasma,
+    // --- percepción limitada por el radio de visión (usada por modelo/objetivos/utilidad) ---
+    radioVision,
+    ghost: visibleFantasma ? {r:ghost.r, c:ghost.c} : null,
+    dotsVisibles
+  };
+}
+
+// Movimiento del fantasma (parte del ENTORNO, no es uno de los agentes que se piden).
+// Con probabilidad PROB_PERSECUCION_FANTASMA persigue a Pac-Man por la RUTA MÁS CORTA
+// real (usando el mismo motor de búsqueda que usan los agentes); el resto de las veces
+// se mueve al azar. Además, con probabilidad PROB_PASO_EXTRA da un segundo paso en el
+// mismo ciclo, es decir, en promedio se mueve ALGO más rápido que Pac-Man. Esta
+// combinación lo vuelve un reto genuino (sí puede alcanzar a un agente descuidado)
+// sin volverlo imposible de evadir para un agente que sí gestiona el riesgo.
+const PROB_PASO_EXTRA = 0.02; // pequeña chance de dar un paso extra: apenas más rápido que Pac-Man
+
+function moverFantasma(juego){
+  darUnPasoFantasma(juego);
+  if(Math.random() < PROB_PASO_EXTRA) darUnPasoFantasma(juego);
+}
+
+function darUnPasoFantasma(juego){
+  const {ghost, pac} = juego;
+  let direccion = null;
+
+  if(Math.random() < PROB_PERSECUCION_FANTASMA){
+    const mapa = calcularMapaDistancias(ghost, null);
+    const destino = key(pac.r, pac.c);
+    if(mapa.primerPaso.has(destino)) direccion = mapa.primerPaso.get(destino);
+  }
+  if(!direccion){
+    const opciones = LISTA_DIRS.filter(([n,dr,dc]) => !esPared(ghost.r+dr, ghost.c+dc));
+    if(opciones.length===0) return;
+    direccion = opciones[Math.floor(Math.random()*opciones.length)][0];
+  }
+  const d = DIRS[direccion];
+  if(!esPared(ghost.r+d.dr, ghost.c+d.dc)){ ghost.r += d.dr; ghost.c += d.dc; }
+}
+
+// Avanza un ciclo completo de percepción -> decisión -> acción -> actualización del entorno.
+// modoAgente: 'manual' | 'reflejo' | 'modelo' | 'objetivos' | 'utilidad'
+function avanzarTick(juego, modoAgente){
+  if(juego.fase !== 'jugando') return {percepcion:null, accion:null};
+
+  const percepcion = generarPercepcion(juego);
+  let accion;
+
+  if(modoAgente === 'manual'){
+    accion = juego.direccionManual || 'quieto';
+  } else if(modoAgente === 'reflejo'){
+    accion = agenteReflejo(percepcion);
+  } else if(modoAgente === 'modelo'){
+    const resultado = agenteModelo(percepcion, juego.estadoInternoModelo);
+    accion = resultado.accion;
+    juego.estadoInternoModelo = resultado.nuevoEstado;
+  } else if(modoAgente === 'objetivos'){
+    const resultado = agenteObjetivos(percepcion, juego.estadoInternoObjetivos);
+    accion = resultado.accion;
+    juego.estadoInternoObjetivos = resultado.nuevoEstado;
+  } else { // 'utilidad'
+    const resultado = agenteUtilidad(percepcion, juego.estadoInternoUtilidad, pesosUtilidad);
+    accion = resultado.accion;
+    juego.estadoInternoUtilidad = resultado.nuevoEstado;
+  }
+
+  const d = DIRS[accion] || DIRS.quieto;
+  const nr = juego.pac.r + d.dr, nc = juego.pac.c + d.dc;
+  if(!esPared(nr,nc)){ juego.pac.r = nr; juego.pac.c = nc; }
+
+  const k = key(juego.pac.r, juego.pac.c);
+  if(juego.dots.has(k)){ juego.dots.delete(k); juego.puntaje += 10; }
+
+  moverFantasma(juego);
+  juego.ticks++;
+
+  if(juego.pac.r===juego.ghost.r && juego.pac.c===juego.ghost.c){
+    juego.fase = 'atrapado';
+  } else if(juego.dots.size===0){
+    juego.fase = 'ganado';
+  } else if(juego.ticks >= LIMITE_TICKS){
+    juego.fase = 'tiempo';
+  }
+
+  return {percepcion, accion};
+}
+
+/* =========================================================================
+   HERRAMIENTAS COMPARTIDAS DE BÚSQUEDA Y MODELADO
+   (no son "agentes"; son utilidades de bajo nivel que los agentes usan)
+   ========================================================================= */
+
+// BFS de ORIGEN ÚNICO A TODOS LOS DESTINOS. Devuelve, para cada celda alcanzable:
+// la distancia en pasos y la primera dirección a tomar desde "inicio" para llegar
+// a ella. Muy eficiente: una sola búsqueda sirve para evaluar todas las metas.
+// Si se indica "peligro", esa celda se trata como bloqueada (no se puede pisar).
+function calcularMapaDistancias(inicio, peligro){
+  const distancias = new Map();
+  const primerPaso = new Map();
+  const inicioKey = key(inicio.r, inicio.c);
+  distancias.set(inicioKey, 0);
+  const cola = [{r:inicio.r, c:inicio.c, primerPaso:null}];
+  while(cola.length){
+    const actual = cola.shift();
+    const dActual = distancias.get(key(actual.r, actual.c));
+    for(const [nombre, ddr, ddc] of LISTA_DIRS){
+      const nr = actual.r+ddr, nc = actual.c+ddc, k = key(nr,nc);
+      if(esPared(nr,nc) || distancias.has(k)) continue;
+      if(peligro && nr===peligro.r && nc===peligro.c) continue;
+      distancias.set(k, dActual+1);
+      const pp = actual.primerPaso || nombre;
+      primerPaso.set(k, pp);
+      cola.push({r:nr, c:nc, primerPaso:pp});
+    }
+  }
+  return {distancias, primerPaso};
+}
+
+// Actualiza la "memoria" de puntos conocidos y celdas visitadas a partir de lo que
+// el agente percibe ESTE ciclo. Un punto se "olvida" en cuanto Pac-Man pisa esa
+// celda (porque, si había un punto ahí, ya fue comido).
+function actualizarConocimientoDots(percepcion, dotsConocidosPrev, visitadasPrev){
+  const dotsConocidos = new Set(dotsConocidosPrev);
+  for(const d of percepcion.dotsVisibles) dotsConocidos.add(key(d.r, d.c));
+  const claveActual = key(percepcion.pacman.r, percepcion.pacman.c);
+  dotsConocidos.delete(claveActual);
+  const visitadas = new Set(visitadasPrev);
+  visitadas.add(claveActual);
+  return {dotsConocidos, visitadas};
+}
+
+// Estima velocidad/sentido del fantasma y predice su posición futura (un paso).
+// Si el fantasma sale del radio de visión, el agente sigue "razonando" con la
+// última posición y velocidad conocidas (extrapolación / dead reckoning), en vez
+// de perder toda noción de dónde podría estar.
+function estimarFantasma(percepcion, estadoAnterior){
+  let ghostPosAnterior = estadoAnterior.ghostPosAnterior;
+  let dirEstim = estadoAnterior.ghostDireccionEstim || {dr:0, dc:0};
+
+  if(percepcion.ghost){ // el fantasma es visible este ciclo: se actualiza la observación
+    if(ghostPosAnterior){
+      dirEstim = { dr: percepcion.ghost.r - ghostPosAnterior.r, dc: percepcion.ghost.c - ghostPosAnterior.c };
+    }
+    ghostPosAnterior = {r: percepcion.ghost.r, c: percepcion.ghost.c};
+  }
+
+  let prediccion = null;
+  if(ghostPosAnterior){
+    prediccion = { r: ghostPosAnterior.r + dirEstim.dr, c: ghostPosAnterior.c + dirEstim.dc };
+  }
+  return { ghostPosAnterior, ghostDireccionEstim: dirEstim, prediccion };
+}
+
+/* =========================================================================
+   AGENTE DE REFLEJO SIMPLE
+   Decide ÚNICAMENTE con la percepción del instante actual, sin memoria de
+   estados anteriores. Conjunto explícito de reglas condición-acción.
+   ========================================================================= */
+function agenteReflejo(percepcion){
+  const direccionesLibres = ['arriba','abajo','izquierda','derecha'].filter(d => percepcion.libre[d]);
+
+  // Regla 1 (evasión): fantasma adyacente -> huir hacia la dirección opuesta si es libre.
+  for(const d of ['arriba','abajo','izquierda','derecha']){
+    if(percepcion.fantasmaAdyacente[d] && percepcion.libre[OPUESTO[d]]) return OPUESTO[d];
+  }
+  // Regla 2 (alimentación): punto en celda adyacente libre -> moverse hacia ella.
+  for(const d of ['arriba','abajo','izquierda','derecha']){
+    if(percepcion.dotAdyacente[d] && percepcion.libre[d]) return d;
+  }
+  // Regla 3 (exploración reactiva): sin puntos adyacentes ni peligro -> dirección libre al azar.
+  if(direccionesLibres.length > 0) return direccionesLibres[Math.floor(Math.random()*direccionesLibres.length)];
+  // Regla 4 (bloqueo total): sin movimiento posible -> quedarse quieto.
+  return 'quieto';
+}
+
+/* =========================================================================
+   AGENTE BASADO EN MODELO
+   Mantiene estado interno (posición/velocidad estimada del fantasma, puntos
+   conocidos, celdas visitadas) y lo usa para PREDECIR antes de decidir:
+   evita la celda donde predice que estará el fantasma y busca el punto
+   conocido más cercano por la ruta más corta.
+   ========================================================================= */
+function agenteModelo(percepcion, estadoInterno){
+  const { dotsConocidos, visitadas } = actualizarConocimientoDots(percepcion, estadoInterno.dotsConocidos, estadoInterno.celdasVisitadas);
+  const { ghostPosAnterior, ghostDireccionEstim, prediccion } = estimarFantasma(percepcion, estadoInterno);
+
+  // Mapa de distancias evitando la celda de peligro predicha (representación explícita del riesgo futuro)
+  const mapa = calcularMapaDistancias(percepcion.pacman, prediccion);
+
+  let accion = elegirHaciaMetaConocida(mapa, dotsConocidos, visitadas);
+  if(accion === null) accion = elegirHaciaExploracion(mapa, visitadas);
+  if(accion === null) accion = agenteReflejo(percepcion); // respaldo de emergencia
+
+  const nuevoEstado = {
+    ghostPosAnterior, ghostDireccionEstim,
+    dotsConocidos: Array.from(dotsConocidos),
+    celdasVisitadas: Array.from(visitadas)
+  };
+  return {accion, nuevoEstado};
+}
+
+// Entre las celdas conocidas con punto, elige la más cercana según el mapa de
+// distancias (prioriza puntos en celdas aún no visitadas). Devuelve null si
+// ninguna es conocida o alcanzable.
+function elegirHaciaMetaConocida(mapa, dotsConocidos, visitadas){
+  let mejorNoVisitada=null, mejorDistNoVisitada=Infinity;
+  let mejorCualquiera=null, mejorDistCualquiera=Infinity;
+  for(const k of dotsConocidos){
+    if(!mapa.distancias.has(k)) continue;
+    const d = mapa.distancias.get(k);
+    if(d < mejorDistCualquiera){ mejorDistCualquiera = d; mejorCualquiera = k; }
+    if(!visitadas.has(k) && d < mejorDistNoVisitada){ mejorDistNoVisitada = d; mejorNoVisitada = k; }
+  }
+  const elegido = mejorNoVisitada || mejorCualquiera;
+  return elegido ? mapa.primerPaso.get(elegido) : null;
+}
+
+// Si no hay ningún punto conocido, explora: va hacia la celda alcanzable más
+// cercana que todavía no ha visitado.
+function elegirHaciaExploracion(mapa, visitadas){
+  let mejor=null, mejorDist=Infinity;
+  for(const [k,d] of mapa.distancias){
+    if(d===0) continue;
+    if(!visitadas.has(k) && d<mejorDist){ mejorDist=d; mejor=k; }
+  }
+  return mejor ? mapa.primerPaso.get(mejor) : null;
+}
+
+/* =========================================================================
+   AGENTE BASADO EN OBJETIVOS
+   Fija una META EXPLÍCITA (el punto conocido más cercano) y la guarda en su
+   estado interno. Mientras esa meta siga existiendo, NO la vuelve a evaluar:
+   simplemente sigue la ruta más corta hacia ella. Para elegir la meta, todas
+   las candidatas que cumplen la condición (ser un punto conocido) valen IGUAL:
+   no pondera valor ni riesgo, sólo distancia. Por eso puede caminar derecho
+   hacia una meta aunque el fantasma esté cerca de la ruta.
+   ========================================================================= */
+function agenteObjetivos(percepcion, estadoInterno){
+  const { dotsConocidos, visitadas } = actualizarConocimientoDots(percepcion, estadoInterno.dotsConocidos, estadoInterno.celdasVisitadas);
+
+  // Mapa de distancias SIN evitar al fantasma: este agente no pondera riesgo.
+  const mapa = calcularMapaDistancias(percepcion.pacman, null);
+
+  let meta = estadoInterno.metaActual;
+  const metaSigueSiendoValida = meta && dotsConocidos.has(meta) && mapa.distancias.has(meta);
+
+  if(!metaSigueSiendoValida){
+    // (Re)fijar la meta: la condición de "meta válida" es simplemente "es un punto conocido".
+    // Entre todas las que cumplen la condición, se elige la MÁS CERCANA, sin más criterio.
+    let mejor=null, mejorDist=Infinity;
+    for(const k of dotsConocidos){
+      if(!mapa.distancias.has(k)) continue;
+      const d = mapa.distancias.get(k);
+      if(d < mejorDist){ mejorDist=d; mejor=k; }
+    }
+    meta = mejor; // puede quedar null si no se conoce ningún punto todavía
+  }
+
+  let accion;
+  if(meta){
+    accion = mapa.primerPaso.get(meta) || 'quieto';
+  } else {
+    // Sin metas conocidas: explorar para descubrir puntos nuevos.
+    accion = elegirHaciaExploracion(mapa, visitadas) || agenteReflejo(percepcion);
+  }
+
+  const nuevoEstado = {
+    metaActual: meta,
+    dotsConocidos: Array.from(dotsConocidos),
+    celdasVisitadas: Array.from(visitadas)
+  };
+  return {accion, nuevoEstado};
+}
+
+/* =========================================================================
+   AGENTE BASADO EN UTILIDAD
+   Genera VARIAS metas candidatas (todos los puntos conocidos) y calcula, para
+   cada una, una utilidad esperada:
+       U = pesos.valor   * valor
+         - pesos.costo   * costoEnPasos
+         - pesos.riesgo  * riesgoDeLaRuta
+         + pesos.novedad * novedad
+   Cada peso gobierna un único término (no se multiplican entre sí) y llega
+   desde AFUERA de la función (parámetro "pesos", controlado por los
+   deslizadores de la interfaz). Se elige la meta de mayor utilidad.
+   ========================================================================= */
+function agenteUtilidad(percepcion, estadoInterno, pesos){
+  const { dotsConocidos, visitadas } = actualizarConocimientoDots(percepcion, estadoInterno.dotsConocidos, estadoInterno.celdasVisitadas);
+  const { ghostPosAnterior, ghostDireccionEstim, prediccion } = estimarFantasma(percepcion, estadoInterno);
+
+  // El movimiento real evita pisar la celda de peligro predicha (igual que el agente de modelo).
+  const mapa = calcularMapaDistancias(percepcion.pacman, prediccion);
+  const visiblesSet = new Set(percepcion.dotsVisibles.map(d => key(d.r,d.c)));
+
+  const tablaMetas = [];
+  for(const k of dotsConocidos){
+    if(!mapa.distancias.has(k)) continue; // meta inalcanzable con la ruta segura: se descarta
+    const [r,c] = k.split(',').map(Number);
+    const costoEnPasos = mapa.distancias.get(k);
+    const valor = 10; // valor base de comer un punto (coincide con el puntaje del juego)
+    const distanciaAlPeligro = prediccion ? distManhattan({r,c}, prediccion) : Infinity;
+    const riesgoDeLaRuta = Math.max(0, RADIO_RIESGO - distanciaAlPeligro); // más cerca del fantasma -> más riesgo
+    const novedad = visiblesSet.has(k) ? 1 : 0.5; // información fresca vs. sólo recordada
+
+    const utilidad = pesos.valor*valor - pesos.costo*costoEnPasos - pesos.riesgo*riesgoDeLaRuta + pesos.novedad*novedad;
+    tablaMetas.push({meta:{r,c}, valor, costo:costoEnPasos, riesgo:riesgoDeLaRuta, novedad, utilidad});
+  }
+  tablaMetas.sort((a,b) => b.utilidad - a.utilidad);
+
+  let accion, metaElegida = null;
+  if(tablaMetas.length > 0){
+    const mejor = tablaMetas[0];
+    metaElegida = mejor.meta;
+    accion = mapa.primerPaso.get(key(mejor.meta.r, mejor.meta.c)) || 'quieto';
+  } else {
+    accion = elegirHaciaExploracion(mapa, visitadas) || agenteReflejo(percepcion);
+  }
+
+  const nuevoEstado = {
+    ghostPosAnterior, ghostDireccionEstim,
+    dotsConocidos: Array.from(dotsConocidos),
+    celdasVisitadas: Array.from(visitadas),
+    metaActual: metaElegida,
+    tablaMetas: tablaMetas.slice(0,8) // sólo se conserva el top-8 para mostrar en el panel
+  };
+  return {accion, nuevoEstado};
+}
+
+/* =========================================================================
+   ESTADO DE LA APLICACIÓN (interfaz + partida visible en pantalla)
+   ========================================================================= */
+let juegoActivo = crearEstadoJuego();
+let faseApp = 'inicio'; // 'inicio' | 'jugando' | 'fin'
+let modoSeleccionado = 'manual';
+let ultimaPercepcion = null;
+let ultimaAccion = null;
+let mensajeFin = '';
+let ultimoTick = 0;
+
+const lienzo = document.getElementById('lienzo');
+const ctx = lienzo.getContext('2d');
+const selectorModo = document.getElementById('selectorModo');
+const btnIniciar = document.getElementById('btnIniciar');
+const btnPausa = document.getElementById('btnPausa');
+const btnExperimento = document.getElementById('btnExperimento');
+const selectorVelocidad = document.getElementById('selectorVelocidad');
+const selectorMedida = document.getElementById('selectorMedida');
+const sliderRadio = document.getElementById('sliderRadio');
+const valorRadio = document.getElementById('valorRadio');
+
+selectorModo.addEventListener('change', () => { modoSeleccionado = selectorModo.value; });
+selectorVelocidad.addEventListener('change', () => { multiplicadorVelocidad = Number(selectorVelocidad.value); });
+selectorMedida.addEventListener('change', () => { medidaDesempeno = selectorMedida.value; document.getElementById('cajaNombreMedida').textContent = etiquetaMedida(medidaDesempeno); });
+sliderRadio.addEventListener('input', () => { radioVision = Number(sliderRadio.value); valorRadio.textContent = radioVision; });
+
+function ligarSliderPeso(idSlider, idValor, campo){
+  const el = document.getElementById(idSlider);
+  const val = document.getElementById(idValor);
+  el.addEventListener('input', () => {
+    pesosUtilidad[campo] = Number(el.value);
+    val.textContent = Number(el.value).toFixed(1);
+  });
+}
+ligarSliderPeso('sliderValor','valorPesoValor','valor');
+ligarSliderPeso('sliderCosto','valorPesoCosto','costo');
+ligarSliderPeso('sliderRiesgo','valorPesoRiesgo','riesgo');
+ligarSliderPeso('sliderNovedad','valorPesoNovedad','novedad');
+
+btnIniciar.addEventListener('click', iniciarPartida);
+btnPausa.addEventListener('click', () => {
+  pausado = !pausado;
+  btnPausa.textContent = pausado ? 'Reanudar' : 'Pausar';
+});
+
+function iniciarPartida(){
+  juegoActivo = crearEstadoJuego();
+  faseApp = 'jugando';
+  pausado = false;
+  btnPausa.textContent = 'Pausar';
+  ultimaPercepcion = null;
+  ultimaAccion = null;
+  mensajeFin = '';
+}
+
+function etiquetaMedida(m){
+  return m==='puntaje' ? 'puntaje' : m==='eficiencia' ? 'eficiencia' : 'supervivencia';
+}
+function calcularMedida(juego, m){
+  if(m==='puntaje') return juego.puntaje;
+  if(m==='supervivencia') return juego.ticks;
+  return juego.ticks>0 ? juego.puntaje/juego.ticks : 0; // eficiencia
+}
+
+// --- Controles de teclado (modo manual) ---
+window.addEventListener('keydown', (e) => {
+  const mapa = {ArrowUp:'arriba', ArrowDown:'abajo', ArrowLeft:'izquierda', ArrowRight:'derecha'};
+  if(mapa[e.key]){ e.preventDefault(); juegoActivo.direccionManual = mapa[e.key]; }
+  if(e.code === 'Space'){ e.preventDefault(); iniciarPartida(); }
+  if(e.key.toLowerCase() === 'p'){ pausado = !pausado; btnPausa.textContent = pausado ? 'Reanudar' : 'Pausar'; }
+});
+
+/* =========================================================================
+   BUCLE PRINCIPAL (requestAnimationFrame)
+   El ritmo lógico (ticks) se desacopla del ritmo de dibujo, y la velocidad
+   seleccionada acorta el intervalo entre ticks para "acelerar" el juego.
+   ========================================================================= */
+function bucle(timestamp){
+  if(faseApp === 'jugando' && !pausado){
+    const intervalo = TICK_MS / multiplicadorVelocidad;
+    if(timestamp - ultimoTick >= intervalo){
+      const {percepcion, accion} = avanzarTick(juegoActivo, modoSeleccionado);
+      if(percepcion){ ultimaPercepcion = percepcion; ultimaAccion = accion; }
+      ultimoTick = timestamp;
+      if(juegoActivo.fase !== 'jugando'){
+        faseApp = 'fin';
+        mensajeFin = juegoActivo.fase === 'atrapado' ? '¡Atrapado por el fantasma!' :
+                     juegoActivo.fase === 'ganado'   ? '¡Recolectaste todos los puntos!' :
+                                                        'Tiempo límite alcanzado.';
+      }
+    }
+  }
+  dibujar();
+  actualizarPanel();
+  requestAnimationFrame(bucle);
+}
+requestAnimationFrame(bucle);
+
+/* =========================================================================
+   DIBUJO (canvas) — estética retro con formas geométricas
+   ========================================================================= */
+function dibujar(){
+  ctx.clearRect(0,0,lienzo.width, lienzo.height);
+  ctx.fillStyle = '#05060c';
+  ctx.fillRect(0,0,lienzo.width, lienzo.height);
+
+  dibujarLaberinto();
+
+  if(faseApp === 'inicio'){ dibujarPantallaInicio(); return; }
+
+  dibujarDots(juegoActivo.dots);
+  dibujarMeta();
+  dibujarFantasma(juegoActivo.ghost);
+  dibujarPacman(juegoActivo.pac);
+  dibujarMarcador(juegoActivo);
+
+  if(faseApp === 'fin') dibujarPantallaFin();
+  if(pausado && faseApp==='jugando') dibujarPausa();
+}
+
+function dibujarLaberinto(){
+  ctx.fillStyle = '#1b2260';
+  ctx.strokeStyle = '#3b46a8';
+  for(let r=0;r<ROWS;r++){
+    for(let c=0;c<COLS;c++){
+      if(esPared(r,c)){
+        ctx.fillRect(c*CELL, r*CELL, CELL, CELL);
+        ctx.strokeRect(c*CELL+1, r*CELL+1, CELL-2, CELL-2);
+      }
+    }
+  }
+}
+
+function dibujarDots(dots){
+  ctx.fillStyle = '#ffd23f';
+  for(const k of dots){
+    const [r,c] = k.split(',').map(Number);
+    ctx.beginPath();
+    ctx.arc(c*CELL+CELL/2, r*CELL+CELL/2, 3, 0, Math.PI*2);
+    ctx.fill();
+  }
+}
+
+// Dibuja la meta actual del agente activo (objetivos o utilidad) como un anillo cian.
+function dibujarMeta(){
+  let meta = null;
+  if(modoSeleccionado === 'objetivos') meta = juegoActivo.estadoInternoObjetivos.metaActual;
+  else if(modoSeleccionado === 'utilidad') meta = juegoActivo.estadoInternoUtilidad.metaActual;
+  if(!meta) return;
+  let r,c;
+  if(typeof meta === 'string'){ [r,c] = meta.split(',').map(Number); }
+  else { r = meta.r; c = meta.c; }
+  const cx = c*CELL+CELL/2, cy = r*CELL+CELL/2;
+  ctx.strokeStyle = '#00e5ff';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, CELL/2-2, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+}
+
+function dibujarPacman(pac){
+  const cx = pac.c*CELL + CELL/2, cy = pac.r*CELL + CELL/2;
+  ctx.fillStyle = '#ffd23f';
+  ctx.beginPath();
+  ctx.arc(cx, cy, CELL/2-3, 0.25*Math.PI, 1.75*Math.PI);
+  ctx.lineTo(cx, cy);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function dibujarFantasma(ghost){
+  const cx = ghost.c*CELL + CELL/2, cy = ghost.r*CELL + CELL/2;
+  const rad = CELL/2 - 4;
+  ctx.fillStyle = '#ff4d6d';
+  ctx.beginPath();
+  ctx.arc(cx, cy-2, rad, Math.PI, 0);
+  ctx.lineTo(cx+rad, cy+rad);
+  ctx.lineTo(cx+rad*0.5, cy+rad*0.6);
+  ctx.lineTo(cx, cy+rad);
+  ctx.lineTo(cx-rad*0.5, cy+rad*0.6);
+  ctx.lineTo(cx-rad, cy+rad);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#0b0e1a';
+  ctx.beginPath();
+  ctx.arc(cx-4, cy-4, 3, 0, Math.PI*2);
+  ctx.arc(cx+4, cy-4, 3, 0, Math.PI*2);
+  ctx.fill();
+}
+
+function dibujarMarcador(juego){
+  ctx.fillStyle = '#e8ebff';
+  ctx.font = 'bold 14px Consolas, monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('PUNTAJE: ' + juego.puntaje, 10, 20);
+  ctx.textAlign = 'right';
+  ctx.fillText('TICKS: ' + juego.ticks, lienzo.width-10, 20);
+}
+
+function dibujarPantallaInicio(){
+  ctx.fillStyle = 'rgba(5,6,12,0.85)';
+  ctx.fillRect(0,0,lienzo.width, lienzo.height);
+  ctx.fillStyle = '#ffd23f';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 30px Consolas, monospace';
+  ctx.fillText('PAC-MAN · AGENTES', lienzo.width/2, lienzo.height/2 - 30);
+  ctx.fillStyle = '#e8ebff';
+  ctx.font = '13px Consolas, monospace';
+  ctx.fillText('Elige un modo y presiona "Iniciar / Reiniciar" o ESPACIO', lienzo.width/2, lienzo.height/2 + 6);
+  ctx.fillText('Flechas = mover (modo manual)   |   P = pausar', lienzo.width/2, lienzo.height/2 + 28);
+}
+
+function dibujarPantallaFin(){
+  ctx.fillStyle = 'rgba(5,6,12,0.85)';
+  ctx.fillRect(0,0,lienzo.width, lienzo.height);
+  ctx.fillStyle = '#ff4d6d';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 24px Consolas, monospace';
+  ctx.fillText(mensajeFin, lienzo.width/2, lienzo.height/2 - 20);
+  ctx.fillStyle = '#e8ebff';
+  ctx.font = '13px Consolas, monospace';
+  ctx.fillText('Puntaje final: ' + juegoActivo.puntaje + '   |   Ticks sobrevividos: ' + juegoActivo.ticks, lienzo.width/2, lienzo.height/2 + 10);
+  ctx.fillText('Presiona ESPACIO o "Iniciar / Reiniciar" para jugar de nuevo', lienzo.width/2, lienzo.height/2 + 32);
+}
+
+function dibujarPausa(){
+  ctx.fillStyle = 'rgba(5,6,12,0.6)';
+  ctx.fillRect(0,0,lienzo.width, lienzo.height);
+  ctx.fillStyle = '#b98bff';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 26px Consolas, monospace';
+  ctx.fillText('PAUSADO', lienzo.width/2, lienzo.height/2);
+}
+
+/* =========================================================================
+   PANEL LATERAL (percepción, estado interno, metas, acción, marcador)
+   ========================================================================= */
+const cajaPercepcion = document.getElementById('cajaPercepcion');
+const cajaEstado = document.getElementById('cajaEstado');
+const cajaAccion = document.getElementById('cajaAccion');
+const cajaPuntaje = document.getElementById('cajaPuntaje');
+const cajaTicks = document.getElementById('cajaTicks');
+const cajaDots = document.getElementById('cajaDots');
+const cajaMedida = document.getElementById('cajaMedida');
+const bloqueTablaMetas = document.getElementById('bloqueTablaMetas');
+const cuerpoTablaMetasPanel = document.querySelector('#tablaMetasPanel tbody');
+
+function actualizarPanel(){
+  cajaPercepcion.textContent = ultimaPercepcion ? JSON.stringify(ultimaPercepcion, null, 1) : '—';
+
+  if(modoSeleccionado === 'modelo'){
+    cajaEstado.textContent = JSON.stringify(juegoActivo.estadoInternoModelo, null, 1);
+    bloqueTablaMetas.style.display = 'none';
+  } else if(modoSeleccionado === 'objetivos'){
+    const est = juegoActivo.estadoInternoObjetivos;
+    cajaEstado.textContent = 'Meta actual: ' + (est.metaActual || '(ninguna, explorando)') +
+      '\nPuntos conocidos: ' + est.dotsConocidos.length +
+      '\n(este agente NO pondera valor ni riesgo: sólo distancia)';
+    bloqueTablaMetas.style.display = 'none';
+  } else if(modoSeleccionado === 'utilidad'){
+    const est = juegoActivo.estadoInternoUtilidad;
+    cajaEstado.textContent = 'Meta elegida: ' + (est.metaActual ? key(est.metaActual.r, est.metaActual.c) : '(ninguna, explorando)') +
+      '\nPuntos conocidos: ' + est.dotsConocidos.length +
+      '\nPesos actuales: ' + JSON.stringify(pesosUtilidad);
+    bloqueTablaMetas.style.display = 'block';
+    cuerpoTablaMetasPanel.innerHTML = '';
+    for(const fila of est.tablaMetas){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${key(fila.meta.r,fila.meta.c)}</td><td>${fila.valor.toFixed(1)}</td><td>${fila.costo.toFixed(1)}</td><td>${fila.riesgo.toFixed(1)}</td><td>${fila.novedad.toFixed(1)}</td><td>${fila.utilidad.toFixed(2)}</td>`;
+      cuerpoTablaMetasPanel.appendChild(tr);
+    }
+  } else {
+    cajaEstado.textContent = '(sólo aplica en modo "objetivos", "utilidad" o "modelo")';
+    bloqueTablaMetas.style.display = 'none';
+  }
+
+  cajaAccion.textContent = ultimaAccion ? ultimaAccion.toUpperCase() : '—';
+  cajaPuntaje.textContent = juegoActivo.puntaje;
+  cajaTicks.textContent = juegoActivo.ticks;
+  cajaDots.textContent = juegoActivo.dots.size + ' / ' + TOTAL_DOTS;
+  cajaMedida.textContent = calcularMedida(juegoActivo, medidaDesempeno).toFixed(2);
+}
+
+/* =========================================================================
+   EXPERIMENTACIÓN: 20 partidas aceleradas por cada agente automático
+   ========================================================================= */
+btnExperimento.addEventListener('click', ejecutarExperimento);
+
+function simularPartida(modoAgente){
+  const juego = crearEstadoJuego();
+  const activoAnterior = juegoActivo;
+  juegoActivo = juego; // por si alguna función de dibujo llegara a consultarlo
+  let salvaguarda = 0;
+  while(juego.fase === 'jugando' && salvaguarda < LIMITE_TICKS + 5){
+    avanzarTick(juego, modoAgente);
+    salvaguarda++;
+  }
+  juegoActivo = activoAnterior;
+  return { puntaje: juego.puntaje, ticks: juego.ticks };
+}
+
+function media(valores){ return valores.reduce((a,b)=>a+b,0) / valores.length; }
+function desviacionEstandar(valores){
+  const m = media(valores);
+  return Math.sqrt(valores.reduce((acc,v)=> acc + (v-m)*(v-m), 0) / valores.length);
+}
+
+const AGENTES_EXPERIMENTO = [
+  {clave:'reflejo',   nombre:'Agente de reflejo simple'},
+  {clave:'modelo',    nombre:'Agente basado en modelo'},
+  {clave:'objetivos', nombre:'Agente basado en objetivos'},
+  {clave:'utilidad',  nombre:'Agente basado en utilidad'}
+];
+
+function ejecutarExperimento(){
+  btnExperimento.disabled = true;
+  btnExperimento.textContent = 'Ejecutando 80 partidas...';
+  faseApp = 'inicio';
+
+  setTimeout(() => {
+    const resultados = [];
+    for(const agente of AGENTES_EXPERIMENTO){
+      const puntajes = [], tiempos = [], eficiencias = [];
+      for(let i=0;i<20;i++){
+        const r = simularPartida(agente.clave);
+        puntajes.push(r.puntaje);
+        tiempos.push(r.ticks);
+        eficiencias.push(r.ticks>0 ? r.puntaje/r.ticks : 0);
+      }
+      resultados.push({
+        nombre: agente.nombre,
+        puntajePromedio: media(puntajes),
+        desviacion: desviacionEstandar(puntajes),
+        supervivenciaPromedio: media(tiempos),
+        eficienciaPromedio: media(eficiencias)
+      });
+    }
+    mostrarResultados(resultados);
+    btnExperimento.disabled = false;
+    btnExperimento.textContent = 'Ejecutar 20 partidas x agente';
+  }, 50);
+}
+
+function mostrarResultados(resultados){
+  const contenedor = document.getElementById('resultados');
+  const tbody = document.querySelector('#tablaResultados tbody');
+  tbody.innerHTML = '';
+
+  const campoOrden = medidaDesempeno==='puntaje' ? 'puntajePromedio' :
+                      medidaDesempeno==='supervivencia' ? 'supervivenciaPromedio' : 'eficienciaPromedio';
+  const ordenados = [...resultados].sort((a,b)=> b[campoOrden]-a[campoOrden]);
+
+  for(const r of ordenados){
+    const fila = document.createElement('tr');
+    if(r === ordenados[0]) fila.className = 'ganador';
+    fila.innerHTML = `<td>${r.nombre}${r===ordenados[0] ? ' 🏆' : ''}</td><td>${r.puntajePromedio.toFixed(1)}</td><td>${r.desviacion.toFixed(1)}</td><td>${r.supervivenciaPromedio.toFixed(1)}</td><td>${r.eficienciaPromedio.toFixed(3)}</td>`;
+    tbody.appendChild(fila);
+  }
+  contenedor.style.display = 'block';
+}
+</script>
+</body>
+</html>
